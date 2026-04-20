@@ -1,0 +1,77 @@
+name: Go Build & Upload Release Assets
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version without v prefix (e.g. 1.2.3)'
+        type: string
+        required: true
+      binary-name:
+        description: 'Output binary name (e.g. drift-warden)'
+        type: string
+        required: true
+      main-package:
+        description: 'Go package path to build (e.g. ./cmd/drift-warden)'
+        type: string
+        required: true
+      platforms:
+        description: 'Space-separated GOOS/GOARCH pairs'
+        type: string
+        default: 'linux/amd64 linux/arm64 darwin/amd64 darwin/arm64'
+      version-var:
+        description: 'Full variable for -X ldflags version injection (e.g. main.version)'
+        type: string
+        default: 'main.version'
+      go-version-file:
+        type: string
+        default: 'go.mod'
+      runner:
+        description: 'Runner labels JSON array'
+        type: string
+        default: '["self-hosted", "linux", "ARM64"]'
+
+    secrets:
+      github-token:
+        required: true
+
+jobs:
+  build-upload:
+    runs-on: ${{ fromJson(inputs.runner) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ inputs.version }}
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+          cache: false
+
+      - name: Fix Go module cache permissions
+        run: chmod -R u+w "$(go env GOMODCACHE)" 2>/dev/null || true
+
+      - name: Cross-compile binaries
+        env:
+          VERSION: ${{ inputs.version }}
+          BINARY: ${{ inputs.binary-name }}
+          MAIN_PKG: ${{ inputs.main-package }}
+          PLATFORMS: ${{ inputs.platforms }}
+          VERSION_VAR: ${{ inputs.version-var }}
+        run: |
+          mkdir -p dist
+          for target in $PLATFORMS; do
+            GOOS="${target%/*}"
+            GOARCH="${target#*/}"
+            out="dist/${BINARY}-${GOOS}-${GOARCH}"
+            GOOS="${GOOS}" GOARCH="${GOARCH}" go build \
+              -ldflags "-X ${VERSION_VAR}=v${VERSION}" \
+              -o "${out}" \
+              "${MAIN_PKG}"
+            echo "✓ ${out}"
+          done
+
+      - name: Upload to GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.github-token }}
+        run: gh release upload "v${{ inputs.version }}" dist/* --clobber

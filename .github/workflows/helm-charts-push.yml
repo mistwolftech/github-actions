@@ -1,0 +1,67 @@
+name: Helm Charts Push (multi-chart)
+
+on:
+  workflow_call:
+    inputs:
+      charts:
+        description: 'Space-separated chart names under charts-dir (e.g. "platform-bootstrap environment-config")'
+        type: string
+        required: true
+      charts-dir:
+        description: 'Directory containing chart subdirectories'
+        type: string
+        default: 'charts'
+      version:
+        description: 'Version to package and push (e.g. 1.2.3)'
+        type: string
+        required: true
+      oci-registry:
+        description: 'OCI registry base URL (e.g. oci://ghcr.io/mistwolftech)'
+        type: string
+        required: true
+      helm-version:
+        type: string
+        default: 'v3.17.3'
+      runner:
+        description: 'Runner labels JSON array'
+        type: string
+        default: '["self-hosted", "linux", "ARM64"]'
+
+    secrets:
+      ghcr-token:
+        required: true
+
+jobs:
+  push:
+    runs-on: ${{ fromJson(inputs.runner) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ inputs.version }}
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ inputs.helm-version }}
+
+      - name: Login to GHCR Helm registry
+        run: echo "${{ secrets.ghcr-token }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Package and push charts
+        env:
+          VERSION: ${{ inputs.version }}
+          CHARTS: ${{ inputs.charts }}
+          CHARTS_DIR: ${{ inputs.charts-dir }}
+          OCI_REGISTRY: ${{ inputs.oci-registry }}
+        run: |
+          mkdir -p dist
+          for chart in $CHARTS; do
+            helm package "${CHARTS_DIR}/${chart}" \
+              --version "${VERSION}" \
+              --app-version "${VERSION}" \
+              -d dist/
+            echo "✓ packaged ${chart}-${VERSION}.tgz"
+          done
+          for chart in $CHARTS; do
+            helm push "dist/${chart}-${VERSION}.tgz" "${OCI_REGISTRY}"
+            echo "✓ pushed ${chart}:${VERSION} → ${OCI_REGISTRY}"
+          done
