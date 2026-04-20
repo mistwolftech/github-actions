@@ -90,12 +90,12 @@ jobs:
       released: ${{ steps.version.outputs.released }}
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ inputs.node-version }}
           cache: npm
@@ -139,7 +139,7 @@ jobs:
 
       - name: Import GPG key
         if: inputs.gpg-signing
-        uses: crazy-max/ghaction-import-gpg@v6
+        uses: crazy-max/ghaction-import-gpg@v7
         with:
           gpg_private_key: ${{ secrets.gpg-private-key }}
           git_user_signingkey: true

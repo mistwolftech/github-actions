@@ -39,7 +39,7 @@ jobs:
   build-upload:
     runs-on: ${{ fromJson(inputs.runner) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: v${{ inputs.version }}
 
