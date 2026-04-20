@@ -74,4 +74,21 @@ jobs:
       - name: Upload to GitHub release
         env:
           GH_TOKEN: ${{ secrets.github-token }}
-        run: gh release upload "v${{ inputs.version }}" dist/* --clobber
+          VERSION: ${{ inputs.version }}
+        run: |
+          UPLOAD_URL=$(curl -fsSL \
+            -H "Authorization: token ${GH_TOKEN}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}" \
+            | jq -r '.upload_url' | sed 's/{?name,label}//')
+
+          for f in dist/*; do
+            name=$(basename "$f")
+            echo "Uploading ${name}…"
+            curl -fsSL \
+              -X POST \
+              -H "Authorization: token ${GH_TOKEN}" \
+              -H "Content-Type: application/octet-stream" \
+              "${UPLOAD_URL}?name=${name}" \
+              --data-binary "@${f}" \
+              | jq -r '.name + " → " + .browser_download_url'
+          done
