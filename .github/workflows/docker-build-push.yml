@@ -73,6 +73,7 @@ jobs:
           file: ${{ inputs.dockerfile }}
           push: true
           platforms: ${{ inputs.platforms }}
+          provenance: false
           build-args: ${{ inputs.build-args }}
           cache-from: ${{ inputs.cache-from }}
           cache-to: ${{ inputs.cache-to }}
