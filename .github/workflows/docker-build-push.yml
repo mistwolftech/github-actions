@@ -31,6 +31,14 @@ on:
         description: 'Also push :latest tag'
         type: boolean
         default: true
+      cache-from:
+        description: 'Cache source (e.g. type=registry,ref=ghcr.io/org/image:buildcache)'
+        type: string
+        default: ''
+      cache-to:
+        description: 'Cache destination (e.g. type=registry,ref=ghcr.io/org/image:buildcache,mode=max)'
+        type: string
+        default: ''
       runner:
         description: 'Runner labels JSON array'
         type: string
@@ -64,6 +72,8 @@ jobs:
           push: true
           platforms: ${{ inputs.platforms }}
           build-args: ${{ inputs.build-args }}
+          cache-from: ${{ inputs.cache-from }}
+          cache-to: ${{ inputs.cache-to }}
           tags: |
             ${{ inputs.image }}:${{ inputs.version }}
             ${{ inputs.push-latest && format('{0}:latest', inputs.image) || '' }}
