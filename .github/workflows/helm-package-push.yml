@@ -1,0 +1,52 @@
+name: Helm Package & Push
+
+on:
+  workflow_call:
+    inputs:
+      chart-path:
+        description: 'Path to the Helm chart directory (e.g. charts/mistwolf-tech)'
+        type: string
+        required: true
+      chart-name:
+        description: 'Chart name used for the packaged .tgz file (e.g. mistwolf-tech)'
+        type: string
+        required: true
+      version:
+        description: 'Chart version to package (e.g. 1.2.3)'
+        type: string
+        required: true
+      registry-owner:
+        description: 'GHCR owner (e.g. mistwolftech) — chart is pushed to oci://ghcr.io/<registry-owner>/charts'
+        type: string
+        required: true
+      helm-version:
+        description: 'Helm version to install'
+        type: string
+        default: 'v3.17.3'
+      runner:
+        description: 'Runner labels JSON array'
+        type: string
+        default: '["self-hosted", "linux", "ARM64"]'
+
+    secrets:
+      ghcr-token:
+        required: true
+
+jobs:
+  helm-push:
+    runs-on: ${{ fromJson(inputs.runner) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ inputs.helm-version }}
+
+      - name: Login to GHCR Helm registry
+        run: echo "${{ secrets.ghcr-token }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Package and push Helm chart
+        run: |
+          helm package "${{ inputs.chart-path }}" --version "${{ inputs.version }}"
+          helm push "${{ inputs.chart-name }}-${{ inputs.version }}.tgz" \
+            "oci://ghcr.io/${{ inputs.registry-owner }}/charts"

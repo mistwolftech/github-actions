@@ -1,0 +1,87 @@
+name: Notify (Telegram + Slack)
+
+on:
+  workflow_call:
+    inputs:
+      pipeline-name:
+        description: 'Pipeline/repo name shown in the notification (e.g. drift-warden)'
+        type: string
+        required: true
+      status:
+        description: '"success" or "failure"'
+        type: string
+        required: true
+      branch:
+        description: 'Branch name'
+        type: string
+        required: true
+      sha:
+        description: 'Commit SHA'
+        type: string
+        required: true
+      actor:
+        description: 'GitHub actor (triggering user)'
+        type: string
+        required: true
+      run-url:
+        description: 'URL to the GitHub Actions run'
+        type: string
+        required: true
+      job-summary:
+        description: 'Newline-separated "job-name: result" pairs (e.g. "tests: success\nbuild: failure")'
+        type: string
+        default: ''
+      runner:
+        description: 'Runner labels JSON array'
+        type: string
+        default: '["self-hosted", "linux", "ARM64"]'
+
+    secrets:
+      telegram-bot-token:
+        required: true
+      telegram-chat-id:
+        required: true
+      slack-webhook:
+        required: true
+
+jobs:
+  notify:
+    runs-on: ${{ fromJson(inputs.runner) }}
+    steps:
+      - name: Send Telegram notification
+        env:
+          BOT_TOKEN: ${{ secrets.telegram-bot-token }}
+          CHAT_ID: ${{ secrets.telegram-chat-id }}
+          STATUS_EMOJI: ${{ inputs.status == 'success' && '✅ OK' || '🔴 FAILED' }}
+          PIPELINE: ${{ inputs.pipeline-name }}
+          BRANCH: ${{ inputs.branch }}
+          SHA: ${{ inputs.sha }}
+          ACTOR: ${{ inputs.actor }}
+          JOB_SUMMARY: ${{ inputs.job-summary }}
+          RUN_URL: ${{ inputs.run-url }}
+        run: |
+          TEXT=$(printf '%s %s pipeline\nBranch: %s\nCommit: %s\nActor: %s\n\n%s\n\n%s' \
+            "${STATUS_EMOJI}" "${PIPELINE}" "${BRANCH}" "${SHA}" "${ACTOR}" \
+            "${JOB_SUMMARY}" "${RUN_URL}")
+          curl -fsSL -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":\"${CHAT_ID}\",\"text\":$(printf '%s' "$TEXT" | jq -Rs .)}"
+
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v2.1.0
+        with:
+          webhook: ${{ secrets.slack-webhook }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "attachments": [{
+                "color": "${{ inputs.status == 'success' && '#43A047' || '#E53935' }}",
+                "title": "${{ inputs.status == 'success' && '✅ OK' || '🔴 FAILED' }} ${{ inputs.pipeline-name }} pipeline",
+                "fields": [
+                  {"title": "Branch", "value": "${{ inputs.branch }}", "short": true},
+                  {"title": "Actor", "value": "${{ inputs.actor }}", "short": true}
+                ],
+                "text": "${{ inputs.job-summary }}",
+                "footer": "<${{ inputs.run-url }}|View run>"
+              }]
+            }
