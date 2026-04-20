@@ -47,6 +47,8 @@ jobs:
 
       - name: Package and push Helm chart
         run: |
-          helm package "${{ inputs.chart-path }}" --version "${{ inputs.version }}"
+          helm package "${{ inputs.chart-path }}" \
+            --version "${{ inputs.version }}" \
+            --app-version "${{ inputs.version }}"
           helm push "${{ inputs.chart-name }}-${{ inputs.version }}.tgz" \
             "oci://ghcr.io/${{ inputs.registry-owner }}/charts"
