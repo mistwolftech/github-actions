@@ -122,8 +122,10 @@ jobs:
       - name: Install yq (mikefarah v4)
         if: inputs.install-yq
         run: |
+          ARCH=$(uname -m)
+          [ "$ARCH" = "x86_64" ] && YQ_ARCH="amd64" || YQ_ARCH="arm64"
           mkdir -p "$HOME/bin"
-          curl -fsSL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_arm64" \
+          curl -fsSL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${YQ_ARCH}" \
             -o "$HOME/bin/yq"
           chmod +x "$HOME/bin/yq"
           echo "$HOME/bin" >> "$GITHUB_PATH"
